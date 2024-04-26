@@ -42,9 +42,17 @@ class Custom_Feed_Api extends WP_REST_Controller
 
     function register_routes()
     {
+		register_rest_route($this->namespace, '/' . $this->rest_base . '/', array(
+            array(
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => array($this, 'add_items'),
+                'permission_callback' => '__return_true'
+            )
+        ));
+
         register_rest_route($this->namespace, '/' . $this->rest_base . '/', array(
             array(
-                'methods'             => 'GET',
+                'methods'             => WP_REST_Server::READABLE,
                 'callback'            => array($this, 'get_items'),
                 'permission_callback' => array($this, 'hola')
             )
@@ -55,12 +63,59 @@ class Custom_Feed_Api extends WP_REST_Controller
         return true;
     }
 
+	function add_items($request)
+    {
+        global $wpdb;
+
+			// Start transaction
+			$wpdb->query('START TRANSACTION');
+
+			try {
+				$wpdb->insert($wpdb->prefix . 'custom_feed', $request['custom_feed']);
+				$custom_feed_id = $wpdb->insert_id;
+				
+				if ($custom_feed_id === false) {
+					throw new Exception('Error al insertar datos en wp_custom_feed.');
+				}
+
+				$custom_feed_meta_data = $request['custom_feed_meta'];
+				$custom_feed_meta_data['activity_id'] = $custom_feed_id;
+				
+				$wpdb->insert($wpdb->prefix . 'custom_feed_meta', $custom_feed_meta_data);
+				$meta_inserted = $wpdb->insert_id;
+			
+				// Verificar si la inserción en wp_custom_feed_meta fue exitosa
+				if ($meta_inserted === false) {
+					throw new Exception('Error al insertar datos en wp_custom_feed_meta.');
+				}
+			
+				$wpdb->query('COMMIT');
+				$inserted_feed = $wpdb->get_row("SELECT * FROM {$wpdb->prefix}custom_feed WHERE id = $custom_feed_id");
+				$inserted_meta = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}custom_feed_meta WHERE activity_id = $custom_feed_id");
+				
+				$response_add = new WP_REST_Response();
+				$response_add->set_data([
+					"custom_feed" => $inserted_feed,
+					"custom_feed_meta" => $inserted_meta,
+					"messagge" => "Successful registration"
+				]);
+				
+				return $response_add;
+
+			} catch (Exception $e) {
+
+				$wpdb->query('ROLLBACK');
+				$response = new WP_REST_Response();
+				return $response->set_data([ "error" => $e->getMessage() ]);
+			}
+    }
+
     function get_items($request)
     {
         
         $response = new WP_REST_Response();
         $response->set_data([
-			"saludo" => "hola",
+			"saludo" => "holaaa",
         ]);
         
         return $response;
