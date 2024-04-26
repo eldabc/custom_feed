@@ -75,20 +75,23 @@ class Custom_Feed_Api extends WP_REST_Controller
 				$custom_feed_id = $wpdb->insert_id;
 				
 				if ($custom_feed_id === false) {
-					throw new Exception('Error al insertar datos en wp_custom_feed.');
+					throw new Exception('Error inserting data in wp_custom_feed.');
 				}
 
 				$custom_feed_meta_data = $request['custom_feed_meta'];
-				$custom_feed_meta_data['activity_id'] = $custom_feed_id;
+
+				foreach ($custom_feed_meta_data as $feed_meta_data) {
+					
+					$feed_meta_data['activity_id'] = $custom_feed_id;
+
+					$wpdb->insert($wpdb->prefix . 'custom_feed_meta', $feed_meta_data);
 				
-				$wpdb->insert($wpdb->prefix . 'custom_feed_meta', $custom_feed_meta_data);
-				$meta_inserted = $wpdb->insert_id;
-			
-				// Verificar si la inserción en wp_custom_feed_meta fue exitosa
-				if ($meta_inserted === false) {
-					throw new Exception('Error al insertar datos en wp_custom_feed_meta.');
+					if ($wpdb->insert_id === false) {
+						throw new Exception('Error inserting data in wp_custom_feed_meta.');
+					}
+				
 				}
-			
+
 				$wpdb->query('COMMIT');
 				$inserted_feed = $wpdb->get_row("SELECT * FROM {$wpdb->prefix}custom_feed WHERE id = $custom_feed_id");
 				$inserted_meta = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}custom_feed_meta WHERE activity_id = $custom_feed_id");
